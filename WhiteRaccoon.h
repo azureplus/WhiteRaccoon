@@ -38,7 +38,7 @@
 @class WRRequestError;
 @class WRRequestListDirectory;
 
-/*======================================================Global Constants, Variables, Structs and Enums============================================================*/
+#pragma mark - Global Constants, Variables, Structs and Enums
 
 typedef enum {
     kWRUploadRequest,
@@ -64,70 +64,48 @@ typedef enum {
 } WRTimeouts;
 
 
-
-
-/*======================================================WRStreamInfo============================================================*/
+#pragma mark - WRStreamInfo
 
 @interface WRStreamInfo:NSObject
-    @property (nonatomic, strong) NSOutputStream    *writeStream;
-    @property (nonatomic, strong) NSInputStream     *readStream;
-    @property (nonatomic, assign) UInt32            bytesConsumedThisIteration;
-    @property (nonatomic, assign) UInt32            bytesConsumedInTotal;
-    @property (nonatomic, assign) SInt64            size;
-    @property (nonatomic, assign) UInt8            *buffer;
+@property (nonatomic, strong) NSOutputStream    *writeStream;
+@property (nonatomic, strong) NSInputStream     *readStream;
+@property (nonatomic, assign) long long         bytesConsumedThisIteration;
+@property (nonatomic, assign) long long         bytesConsumedInTotal;
+@property (nonatomic, assign) float             completedPercentage;
+@property (nonatomic, assign) long long         maximumSize;
+@property (nonatomic, assign) UInt8            *buffer;
 
 @end
 
-
-
-
-
-
-
-/*======================================================WRRequestDelegate============================================================*/
+#pragma mark - WRRequestDelegate
 
 @protocol WRRequestDelegate  <NSObject>
 
 @required
--(void) requestCompleted:(WRRequest *) request;
--(void) requestFailed:(WRRequest *) request;
+- (void)requestCompleted:(WRRequest *) request;
+- (void)requestFailed:(WRRequest *) request;
 
 @optional
--(BOOL) shouldOverwriteFileWithRequest: (WRRequest *) request;
-
+- (void)requestStarted:(WRRequest *)request;
+- (BOOL)shouldOverwriteFileWithRequest: (WRRequest *) request;
+- (void)progressUpdatedTo:(CGFloat)percentage receivedDataSize:(CGFloat)receivedDataSize  expectedDownloadSize:(CGFloat)expectedDownloadSize;
 
 @end
 
 
-
-
-
-
-
-
-
-
-
-
-/*======================================================WRQueueDelegate============================================================*/
+#pragma mark - WRQueueDelegate
 
 @protocol WRQueueDelegate  <WRRequestDelegate>
 
 @required
--(void) queueCompleted:(WRRequestQueue *)queue;
+- (void) queueCompleted:(WRRequestQueue *)queue;
 
 
 @end
-
-
-
-
-
-
-/*======================================================WRBase============================================================*/
+#pragma mark - WRBase
 //Abstract class, do not instantiate
 @interface WRBase : NSObject {
-@protected 
+@protected
     NSString * path;
     NSString * hostname;
 }
@@ -139,31 +117,22 @@ typedef enum {
 @property (nonatomic, strong) NSString * hostname;
 @property (weak, nonatomic, readonly) NSString * credentials;
 @property (weak, nonatomic, readonly) NSURL * fullURL;
+@property (weak, nonatomic, readonly) NSString * fullURLString;
 @property (nonatomic, strong) NSString * path;
 @property (nonatomic, assign) BOOL passive;
 @property (nonatomic, strong) WRRequestError * error;
 
--(void) start;
--(void) destroy;
+- (void) start;
+- (void) destroy;
 
 +(NSDictionary *) cachedFolders;
 +(void) addFoldersToCache:(NSArray *) foldersArray forParentFolderPath:(NSString *) key;
 
 @end
 
+#pragma mark - WRRequest
 
-
-
-
-
-
-
-
-/*======================================================WRRequest============================================================*/
-
-@interface WRRequest : WRBase {
-    
-}
+@interface WRRequest : WRBase
 
 @property (nonatomic, strong) WRRequest * nextRequest;
 @property (nonatomic, strong) WRRequest * prevRequest;
@@ -172,57 +141,30 @@ typedef enum {
 @property (strong, nonatomic, readonly) WRStreamInfo * streamInfo;
 @property (nonatomic, assign) BOOL didManagedToOpenStream;
 
+@end
+
+#pragma mark - WRRequestDownload
+
+@interface WRRequestDownload : WRRequest<NSStreamDelegate>
+
+@property (nonatomic, readwrite) BOOL downloadToMemoryBlock;
+@property (nonatomic, retain) NSURL *downloadLocation;
+@property (nonatomic, strong) NSMutableData * receivedData;
+
+- (void)startWithFullURL:(NSURL *)fullURL;
 
 @end
 
+#pragma mark - WRRequestUpload
 
-
-
-
-
-
-
-
-/*======================================================WRRequestDownload============================================================*/
-
-@interface WRRequestDownload : WRRequest<NSStreamDelegate> {
-  
-}
-
-@property (nonatomic, strong) NSData * receivedData;
-
-@end
-
-
-
-
-
-
-
-
-
-
-/*======================================================WRRequestUpload============================================================*/
-
-@interface WRRequestUpload : WRRequest<WRRequestDelegate, NSStreamDelegate> {
-    
-}
+@interface WRRequestUpload : WRRequest<WRRequestDelegate, NSStreamDelegate>
 
 @property (nonatomic, strong) WRRequestListDirectory * listrequest;
 @property (nonatomic, strong) NSData * sentData;
 
 @end
 
-
-
-
-
-
-
-
-
-
-/*======================================================WRRequestDelete============================================================*/
+#pragma mark - WRRequestDelete
 
 @interface WRRequestDelete : WRRequest<NSStreamDelegate> {
     BOOL isDirectory;
@@ -230,78 +172,41 @@ typedef enum {
 
 @end
 
+#pragma mark - WRRequestCreateDirectory
 
-
-
-
-
-
-
-
-/*======================================================WRRequestCreateDirectory============================================================*/
-
-@interface WRRequestCreateDirectory : WRRequestUpload<NSStreamDelegate> {
-    
-}
+@interface WRRequestCreateDirectory : WRRequestUpload<NSStreamDelegate>
 
 @end
 
+#pragma mark - WRRequestListDir
 
-
-
-
-
-
-
-
-
-/*======================================================WRRequestListDir============================================================*/
-
-@interface WRRequestListDirectory : WRRequestDownload<NSStreamDelegate> {
-   
-}
+@interface WRRequestListDirectory : WRRequestDownload<NSStreamDelegate>
 
 @property (nonatomic, strong) NSArray * filesInfo;
 
-
 @end
 
-
-
-
-
-
-
-
-
-
-
-/*======================================================WRRequestQueue============================================================*/
+#pragma mark - WRRequestQueue
 
 //  Used to add requests (read, write) to a queue.
 //  The request will be sent to the server in the order in which they were added.
 //  If an error occures on one of the operations
 
 @interface WRRequestQueue : WRBase<WRRequestDelegate> {
-   @private
+@private
     WRRequest * headRequest;
     WRRequest * tailRequest;
-    
+
 }
 
 @property (nonatomic, strong) id<WRQueueDelegate> delegate;
 
--(void) addRequest:(WRRequest *) request;
--(void) addRequestInFront:(WRRequest *) request;
--(void) addRequestsFromArray: (NSArray *) array;
--(void) removeRequestFromQueue:(WRRequest *) request;
+- (void) addRequest:(WRRequest *) request;
+- (void) addRequestInFront:(WRRequest *) request;
+- (void) addRequestsFromArray: (NSArray *) array;
+- (void) removeRequestFromQueue:(WRRequest *) request;
 
 @end
-
-
-
-
-
 
 typedef enum {
     //client errors
@@ -309,39 +214,32 @@ typedef enum {
     kWRFTPClientCantOpenStream = 902,
     kWRFTPClientCantWriteStream = 903,
     kWRFTPClientCantReadStream = 904,
-    kWRFTPClientSentDataIsNil = 905,    
+    kWRFTPClientSentDataIsNil = 905,
     kWRFTPClientFileAlreadyExists = 907,
     kWRFTPClientCantOverwriteDirectory = 908,
     kWRFTPClientStreamTimedOut = 909,
-    
+
     // 400 FTP errors
     kWRFTPServerAbortedTransfer = 426,
     kWRFTPServerResourceBusy = 450,
     kWRFTPServerCantOpenDataConnection = 425,
-    
+
     // 500 FTP errors
     kWRFTPServerUserNotLoggedIn = 530,
     kWRFTPServerFileNotAvailable = 550,
     kWRFTPServerStorageAllocationExceeded = 552,
     kWRFTPServerIllegalFileName = 553,
     kWRFTPServerUnknownError
-    
+
 } WRErrorCodes;
 
+#pragma mark - WRRequestError
 
-
-
-/*======================================================WRRequestError============================================================*/
-
-@interface WRRequestError : NSObject {
-    
-}
+@interface WRRequestError : NSObject
 
 @property (nonatomic, assign) WRErrorCodes errorCode;
 @property (weak, nonatomic, readonly) NSString * message;
 
--(WRErrorCodes) errorCodeWithError:(NSError *) error;
+- (WRErrorCodes) errorCodeWithError:(NSError *) error;
+
 @end
-
-
-
